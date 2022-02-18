@@ -14,9 +14,9 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const OUTFILE = "types.go"
+const outfile = "types.go"
 
-type Body struct {
+type body struct {
 	Schema struct {
 		QueryType struct {
 			Name string `json:"name"`
@@ -25,18 +25,18 @@ type Body struct {
 			Name string `json:"name"`
 		} `json:"mutationType"`
 		SubscriptionType interface{} `json:"subscriptionType"`
-		Types            []Type      `json:"types"`
+		Types            []goType    `json:"types"`
 	} `json:"__schema"`
 }
 
-type EnumValue struct {
+type enumValue struct {
 	Name              string      `json:"name"`
 	Description       string      `json:"description"`
 	IsDeprecated      bool        `json:"isDeprecated"`
 	DeprecationReason interface{} `json:"deprecationReason"`
 }
 
-type Type struct {
+type goType struct {
 	Kind        string `json:"kind"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -66,12 +66,12 @@ type Type struct {
 		IsDeprecated      bool        `json:"isDeprecated"`
 		DeprecationReason interface{} `json:"deprecationReason"`
 	} `json:"fields"`
-	EnumValues []EnumValue `json:"enumValues"`
+	EnumValues []enumValue `json:"enumValues"`
 }
 
-// BasicType describes the essential information required to construct a Go type
+// basicType describes the essential information required to construct a Go type
 // from the JSON type descriptor.
-type BasicType struct {
+type basicType struct {
 	PropertyName string
 	Name         string
 	Comment      string
@@ -140,14 +140,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var body Body
-	if err := json.Unmarshal(bs, &body); err != nil {
+	var b body
+	if err := json.Unmarshal(bs, &b); err != nil {
 		log.Fatal(err)
 	}
 
 	out := jen.NewFile("storefront")
 
-	for _, t := range body.Schema.Types {
+	for _, t := range b.Schema.Types {
 		// Types that begin with __ are internal, I think. Omit them.
 		if strings.HasPrefix(t.Name, "__") {
 			continue
@@ -161,7 +161,7 @@ func main() {
 				continue
 			}
 
-			var fields []BasicType
+			var fields []basicType
 
 			for _, f := range t.Fields {
 				// If we're to leverage the built-in Go type, look it up from the map.
@@ -225,7 +225,7 @@ func main() {
 					comment = fmt.Sprintf("%s: %s: %s", "Deprecated", name, f.Description)
 				}
 
-				fields = append(fields, BasicType{
+				fields = append(fields, basicType{
 					PropertyName: name,
 					Name:         f.Name,
 					Comment:      comment,
@@ -285,7 +285,7 @@ func main() {
 		}
 	}
 
-	if err := out.Save(OUTFILE); err != nil {
+	if err := out.Save(outfile); err != nil {
 		log.Fatal(err)
 	}
 }
