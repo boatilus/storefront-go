@@ -28,6 +28,13 @@ type _expected struct {
 var expected _expected
 
 func init() {
+	if expectedJSONEnv := os.Getenv("EXPECTED_JSON"); expectedJSONEnv != "" {
+		if err := json.Unmarshal([]byte(expectedJSONEnv), &expected); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	bs, err := ioutil.ReadFile(path.Join("test", "expected.json"))
 	if err != nil {
 		log.Fatal(err)
