@@ -1,11 +1,10 @@
 # storefront-go
 
-> **IMPORTANT NOTE**
-> This library is highly experimental and currently very minimally tested. It's being dogfooded in a current commercial project, but isn't production-worthy, and is probably heavily broken.
-
-`storefront-go` is a Go client for Shopify's [Storefront](https://shopify.dev/api/storefront#top) API. It's focused on the ergonomics around querying rather than on mutation, using schema introspection and code generation to provide types, but otherwise providing a pretty bog standard HTTP client interface.
+`storefront-go` is a Go client for [Shopify's Storefront API](https://shopify.dev/api/storefront#top). It's focused on the ergonomics around querying rather than on mutation, using schema introspection and code generation to provide types, but otherwise providing a pretty bog standard HTTP client interface.
 
 Documentation is "best effort" given the existing documentation within the schema and doesn't conform to Go best standards with respect to formatting.
+
+> ⚠️ **IMPORTANT NOTE**: This library is highly experimental and currently very minimally tested. It's being dogfooded in a current commercial project, but isn't production-worthy, and is probably heavily broken.
 
 ## Requirements
 
@@ -13,7 +12,7 @@ Documentation is "best effort" given the existing documentation within the schem
 
 ## Introspecting the Schema
 
-The current schema, `2022-01`, is provided in the `schema/2022-01` directory. To use a different API version, use the [Apollo CLI](https://www.apollographql.com/docs/devtools/cli/) to introspect your store's Storefront endpoint with your access token provided as the `X-Shopify-Storefront-Access-Token` header. Code generation uses the JSON version:
+The current stable schema, `2022-01`, is provided in the `schema/2022-01` directory. To use a different API version, use the [Apollo CLI](https://www.apollographql.com/docs/devtools/cli/) to introspect your store's Storefront API endpoint with your access token provided as the `X-Shopify-Storefront-Access-Token` header. Code generation uses the JSON version:
 
 ```bash
 npm install -g graphql apollo
@@ -21,7 +20,7 @@ npm install -g graphql apollo
 
 apollo schema:download schema/<API_VERSION>/schema.json \
   --endpoint=https://<DOMAIN>/api/<API_VERSION>/graphql.json \
-  --header="X-Shopify-Storefront-Access-Token: <API_KEY>"
+  --header="X-Shopify-Storefront-Access-Token: <ACCESS_TOKEN>"
 ```
 
 For reference, to grab the native GraphQL schema, use [Rover](https://www.apollographql.com/docs/rover/) instead:
@@ -31,13 +30,13 @@ npm install -g rover
 # or yarn global rover
 
 rover graph introspect https://<DOMAIN>/api/<API_VERSION>/graphql.json \
-  --header "X-Shopify-Storefront-Access-Token: <API_KEY>" \
+  --header "X-Shopify-Storefront-Access-Token: <ACCESS_TOKEN>" \
   > schema/<API_VERSION>/schema.graphqls```
 ````
 
 ## Generating Types
 
-Types from introspecting the current stable `2022-01` schema are already implemented in [`types.go`](types.go). If, as above, you need to target a different API version, manually run `scripts/parse.go`, pointing to the JSON schema file you'd like to use (using `go generate` directly won't be a good option until 1.18 final). So, presently:
+Types from introspecting the current stable `2022-01` schema are already implemented in [`types.go`](types.go). If, as above, you need to target a different API version, manually run `scripts/parse.go`, pointing to the schema file you'd like to use (using `go generate` directly won't be a good option until 1.18 final). So, presently:
 
 ```bash
 go1.18beta2 run scripts/parse.go <PATH_TO_SCHEMA>
@@ -49,10 +48,9 @@ This will overwrite the existing `types.go`.
 
 ```go
 import "log"
-
 import "github.com/boatilus/storefront-go"
 
-sf := storefront.NewClient("DOMAIN", "API_KEY")
+sf := storefront.NewClient("<DOMAIN>", "<ACCESS_TOKEN>")
 
 var set storefront.Set
 if err := sf.Query(`{
@@ -69,4 +67,63 @@ if err := sf.Query(`{
 
 log.Print(set.Data.Collections.Edges[0].Node.Title)
 // Outputs: Example Product Title
+```
+
+A convenience function, `LoadQuery`, is also provided to make reading queries from the filesystem a bit easier. There is no syntax validation or otherwise -- it merely reads the file contents and returns a string you can then pass into `Query`.
+
+```go
+import "github.com/boatilus/storefront-go"
+
+q, err := LoadQuery("path/to/query.graphql")
+if err != nil {
+  // Handle
+}
+
+var set storefront.Set
+if err := sf.Query(q, &set); err != nil {
+  // Handle
+}
+```
+
+## Running the Tests
+
+This is complicated.
+
+Currently, Shopify doesn't provide something like a Dockerfile that lets us spin up a test store, so to ensure types are being generated correctly, we have to rely on end-to-end tests against real (or real _demo_) stores.
+
+To set up the environment for passing tests, do the following:
+
+### Specify Credentials In .env
+
+Create a .env in the project root:
+
+```env
+SHOPIFY_DOMAIN=<YOUR_STORE_DOMAIN>
+SHOPIFY_STOREFRONT_ACCESS_TOKEN=<YOUR_ACCESS_TOKEN>
+```
+
+### Specify Expected Values In expected.json
+
+Create an `expected.json` in the `test` directory, providing values from your store. A schema for `expected.json` is included for reference. Minimally, `expected.json` should contain something like:
+
+```json
+{
+  "collections": {
+    "title": "Home page",
+    "description": "Basic description"
+  },
+  "shop": {
+    "name": "Shop name"
+  }
+}
+```
+
+### Run the Test Command
+
+You can then run `go test` using something like [godotenv](https://github.com/joho/godotenv):
+
+```bash
+godotenv go test
+# or, currently:
+# godotenv go1.18beta2 test
 ```
