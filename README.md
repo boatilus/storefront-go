@@ -1,5 +1,7 @@
 # storefront-go
 
+![build](https://github.com/boatilus/storefront-go/actions/workflows/go.yml/badge.svg) [![Go Reference](https://pkg.go.dev/badge/github.com/boatilus/storefront-go.svg)](https://pkg.go.dev/github.com/boatilus/storefront-go)
+
 `storefront-go` is a Go client for [Shopify's Storefront API](https://shopify.dev/api/storefront#top). It's focused on the ergonomics around querying rather than on mutation, using schema introspection and code generation to provide types, but otherwise providing a pretty bog standard HTTP client interface.
 
 Documentation is "best effort" given the existing documentation within the schema and doesn't conform to Go best standards with respect to formatting.
@@ -8,7 +10,7 @@ Documentation is "best effort" given the existing documentation within the schem
 
 ## Requirements
 
-`shopify-go` uses generics to streamline some aspects of working with the API, and therefore requires Go 1.18 (the current beta version [beta 2] works). There is no plan to support Go < 1.18.
+`storefront-go` uses generics to streamline some aspects of working with the API, and therefore requires Go 1.18 (the current beta version [beta 2] works). There is no plan to support Go < 1.18.
 
 ## Introspecting the Schema
 
@@ -44,11 +46,20 @@ go1.18beta2 run scripts/parse.go <PATH_TO_SCHEMA>
 
 This will overwrite the existing `types.go`.
 
+## Installing
+
+```bash
+go1.18beta2 get github.com/boatilus/storefront-go
+```
+
 ## Basic Usage
 
 ```go
-import "log"
-import "github.com/boatilus/storefront-go"
+import (
+    "log"
+    
+    "github.com/boatilus/storefront-go"
+)
 
 sf := storefront.NewClient("<DOMAIN>", "<ACCESS_TOKEN>")
 
@@ -57,7 +68,7 @@ if err := sf.Query(`{
     collections(first: 1) {
       edges {
         node {
-					title
+	  title
         }
       }
     }
@@ -74,7 +85,9 @@ A convenience function, `LoadQuery`, is also provided to make reading queries fr
 ```go
 import "github.com/boatilus/storefront-go"
 
-q, err := LoadQuery("path/to/query.graphql")
+sf := storefront.NewClient("<DOMAIN>", "<ACCESS_TOKEN>")
+
+q, err := storefront.LoadQuery("path/to/query.graphql")
 if err != nil {
   // Handle
 }
@@ -87,13 +100,13 @@ if err := sf.Query(q, &set); err != nil {
 
 ## Running the Tests
 
-This is complicated.
+This is a little complicated.
 
-Currently, Shopify doesn't provide something like a Dockerfile that lets us spin up a test store, so to ensure types are being generated correctly, we have to rely on end-to-end tests against real (or real _demo_) stores.
+Currently, Shopify doesn't provide a container that'd let us spin up a local test store/Storefront endpoint, so to ensure types are being generated correctly, we really have to rely on end-to-end tests against real (or _real demo_) stores.
 
 To set up the environment for passing tests, do the following:
 
-### Specify Credentials In .env
+### Specify Credentials in .env
 
 Create a .env in the project root:
 
@@ -102,9 +115,9 @@ SHOPIFY_DOMAIN=<YOUR_STORE_DOMAIN>
 SHOPIFY_STOREFRONT_ACCESS_TOKEN=<YOUR_ACCESS_TOKEN>
 ```
 
-### Specify Expected Values In expected.json
+### Specify Expected Values in expected.json
 
-Create an `expected.json` in the `test` directory, providing values from your store. A schema for `expected.json` is included for reference. Minimally, `expected.json` should contain something like:
+Create an `expected.json` in the `test` directory, providing values from your store. A [test/expected.schema.json](schema) for `expected.json` is included for reference. Minimally, `expected.json` should contain something like:
 
 ```json
 {
@@ -120,7 +133,7 @@ Create an `expected.json` in the `test` directory, providing values from your st
 
 ### Run the Test Command
 
-You can then run `go test` using something like [godotenv](https://github.com/joho/godotenv):
+You can then run `go test` using something like [godotenv](https://github.com/joho/godotenv) to inject `.env` into the environment (or specify them in whatever way you prefer):
 
 ```bash
 godotenv go test
