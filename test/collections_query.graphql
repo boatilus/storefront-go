@@ -1,0 +1,12 @@
+{
+  collections(first: 1) {
+    edges {
+      node {
+        id
+        title
+        description
+        updatedAt
+      }
+    }
+  }
+}

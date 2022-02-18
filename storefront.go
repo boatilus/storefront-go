@@ -12,7 +12,15 @@ import (
 	"time"
 )
 
-const API_VERSION = "2022-01"
+// APIVersion is the Shopify Storefront API version. This value should match
+// that of the generated types.
+var APIVersion = "2022-01"
+
+// Set describes the full result set from a query. It encloses multiple result
+// sets within an enclosed data property.
+type Set struct {
+	Data QueryRoot `json:"data"`
+}
 
 // Connection describes a type for paginating through multiple objects. It
 // essentially encompasses a list of edges, whose edges contain a node, which
@@ -32,13 +40,8 @@ type Edge[T any] struct {
 	Node T `json:"node,omitempty"`
 }
 
-// Set describes the full result set from a query. It encloses multiple result
-// sets within an enclosed data property.
-type Set struct {
-	Data QueryRoot `json:"data,omitempty"`
-}
-
-// Client describes an HTTP client for the Storefront API with credentials.
+// Client describes a wrapper object of an HTTP client for the Storefront API
+// with credentials.
 type Client struct {
 	endpoint    string
 	accessToken string
@@ -46,25 +49,37 @@ type Client struct {
 }
 
 // NewClient constructs a new instance of a Storefront client given the store
-// domain and access token.
-func NewClient(domain, accessToken string) *Client {
+// domain and access token. Optionally, provide a single *http.Client to use
+// rather than a defaulted http.Client.
+//
+// Note that the default HTTP client sets a 10-second timeout.
+func NewClient(domain, accessToken string, httpClient ...*http.Client) *Client {
 	endpoint := url.URL{
 		Scheme: "https",
 		Host:   domain,
-		Path:   path.Join("api", API_VERSION, "graphql.json"),
+		Path:   path.Join("api", APIVersion, "graphql.json"),
 	}
 
-	httpClient := &http.Client{
+	if len(httpClient) != 0 {
+		return &Client{
+			endpoint:    endpoint.String(),
+			accessToken: accessToken,
+			HTTPClient:  httpClient[0],
+		}
+	}
+
+	httpC := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
 	return &Client{
 		endpoint:    endpoint.String(),
 		accessToken: accessToken,
-		HTTPClient:  httpClient,
+		HTTPClient:  httpC,
 	}
 }
 
+// Query executes a query against the Storefront API endpoint.
 func (c *Client) Query(q string, out interface{}) error {
 	reader := strings.NewReader(q)
 
@@ -96,12 +111,15 @@ func (c *Client) Query(q string, out interface{}) error {
 	return nil
 }
 
-var ErrInvalidFilename = errors.New("an invalid filename was specified")
+// ErrEmptyFilename indicates that an empty filename was supplied to LoadQuery.
+var ErrEmptyFilename = errors.New("an empty filename was specified")
 
-// LoadQuery opens the specify file and returns a string value for the query.
+// LoadQuery opens the specified file and returns a string value of the query.
+// It's the caller's responsibility to verify the file contains a valid
+// GraphQL query.
 func LoadQuery(filename string) (string, error) {
 	if filename == "" {
-		return "", ErrInvalidFilename
+		return "", ErrEmptyFilename
 	}
 
 	bs, err := ioutil.ReadFile(filename)
@@ -109,5 +127,5 @@ func LoadQuery(filename string) (string, error) {
 		return "", err
 	}
 
-	return string(bs), err
+	return string(bs), nil
 }

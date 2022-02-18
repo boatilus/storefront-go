@@ -1,0 +1,54 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"required": [
+		"collections",
+		"shop"
+	],
+	"properties": {
+		"collections": {
+			"$id": "#root/collections",
+			"title": "Collections",
+			"type": "object",
+			"required": [
+				"title"
+			],
+			"properties": {
+				"title": {
+					"$id": "#root/collections/title",
+					"title": "Title",
+					"type": "string",
+					"examples": [
+						"Haircare"
+					]
+				},
+				"description": {
+					"$id": "#root/collections/description",
+					"title": "Description",
+					"type": "string",
+					"examples": [
+						"Basic description"
+					]
+				}
+			}
+		},
+		"shop": {
+			"$id": "#root/shop",
+			"title": "Shop",
+			"type": "object",
+			"required": [
+				"name"
+			],
+			"properties": {
+				"name": {
+					"$id": "#root/shop/name",
+					"title": "Name",
+					"type": "string",
+					"examples": [
+						"Shop Name"
+					]
+				}
+			}
+		}
+	}
+}
