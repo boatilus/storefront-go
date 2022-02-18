@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/dave/jennifer/jen"
@@ -14,8 +15,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// outfile is the filename to write out the generated types.
 const outfile = "types.go"
 
+// body describes the schema's JSON structure.
 type body struct {
 	Schema struct {
 		QueryType struct {
@@ -25,10 +28,11 @@ type body struct {
 			Name string `json:"name"`
 		} `json:"mutationType"`
 		SubscriptionType interface{} `json:"subscriptionType"`
-		Types            []goType    `json:"types"`
+		Types            []gqlType   `json:"types"`
 	} `json:"__schema"`
 }
 
+// enumValue describes a GraphQL enum value.
 type enumValue struct {
 	Name              string      `json:"name"`
 	Description       string      `json:"description"`
@@ -36,7 +40,8 @@ type enumValue struct {
 	DeprecationReason interface{} `json:"deprecationReason"`
 }
 
-type goType struct {
+// gqlType describes a GraphQL type.
+type gqlType struct {
 	Kind        string `json:"kind"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -74,17 +79,18 @@ type goType struct {
 type basicType struct {
 	PropertyName string
 	Name         string
+	Description  string
 	Comment      string
 	GoType       string
 }
 
-// A list of enums to skip generating, since it gets mildly excessive.
+// A list of enums to skip during generation, since it gets mildly excessive.
 var enumSkip = []string{
 	"CountryCode", "CurrencyCode", "WeightUnit",
 	"UnitPriceMeasurementMeasuredType", "UnitPriceMeasurementMeasuredUnit",
 }
 
-// typeMap maps
+// typeMap maps GraphQL/Storefront types to Go's types.
 var typeMap = map[string]string{
 	"Boolean":  "bool",
 	"Decimal":  "float64",
@@ -99,6 +105,7 @@ var typeMap = map[string]string{
 	"URL":      "string",
 }
 
+// acronymMap acts as a LUT to correctly case generated identifiers.
 var acronymMap = map[string]string{
 	"Html":    "HTML",
 	"Seo":     "SEO",
@@ -108,6 +115,7 @@ var acronymMap = map[string]string{
 	"Webp":    "WebP",
 	"Url":     "URL",
 	"Jcb":     "JCB",
+	"Sku":     "SKU",
 	"Ssl":     "SSL",
 	"Youtube": "YouTube",
 	"Zip":     "ZIP",
@@ -181,7 +189,7 @@ func main() {
 					typ = val
 				}
 
-				// If the type is a list, traverse leafs further down and determine
+				// If the type is a list, traverse leaves further down and determine
 				// the element type.
 				if f.Type.Kind == "LIST" || f.Type.OfType.Kind == "LIST" {
 					elementTypeName := f.Type.OfType.OfType.Name
@@ -228,6 +236,7 @@ func main() {
 				fields = append(fields, basicType{
 					PropertyName: name,
 					Name:         f.Name,
+					Description:  f.Description,
 					Comment:      comment,
 					GoType:       typ,
 				})
@@ -256,7 +265,7 @@ func main() {
 
 				props = append(
 					props,
-					jen.Comment(f.Comment),
+					jen.Comment(transformFieldComment(f.PropertyName, f.Description)),
 					jen.Add(name, qual, tag),
 				)
 			}
@@ -288,6 +297,63 @@ func main() {
 	if err := out.Save(outfile); err != nil {
 		log.Fatal(err)
 	}
+}
+
+var fetchReturnsOrFindRgx = regexp.MustCompile(`^(Fetch|Returns|Find\w*)\s(an|a|the)`)
+var mutationTermRgx = regexp.MustCompile(`^(Creates|Updates|Adds|Removes|Completes|Associates|Disassociates|Applies|Appends|Sets|Activates|Sends|Resets\w*)\s(an|a|the)`)
+var whetherRegex = regexp.MustCompile(`^(Whether\w*)\s(an|a|the)`)
+var specialsRegex = regexp.MustCompile(`^(Stripped|Image\w*)`)
+
+// transformFieldComment accepts an identifier and the GQL description,
+// attempting to hack together a more Go-like doc comment.
+func transformFieldComment(identifier, s string) string {
+	// the "connecting word", i.e. the word inserted betwixt the identifier and
+	// the normalized comment.
+	const cw = "is"
+
+	if fetchReturnsOrFindRgx.MatchString(s) {
+		return fmt.Sprintf("%s %s %s", identifier, cw, fetchReturnsOrFindRgx.ReplaceAllString(s, "$2"))
+	}
+	if mutationTermRgx.MatchString(s) {
+		return fmt.Sprintf(
+			"%s %s",
+			identifier,
+			mutationTermRgx.ReplaceAllStringFunc(s, func(ss string) string {
+				return strings.ToLower(ss)
+			}))
+	}
+	if whetherRegex.MatchString(s) {
+		return fmt.Sprintf("%s %s %s", identifier, cw, whetherRegex.ReplaceAllString(s, "whether $2"))
+	}
+	if specialsRegex.MatchString(s) {
+		return fmt.Sprintf(
+			"%s %s %s",
+			identifier,
+			cw,
+			specialsRegex.ReplaceAllStringFunc(s, func(ss string) string {
+				return "the " + strings.ToLower(ss)
+			}))
+	}
+	if strings.HasPrefix(s, "List of") {
+		return fmt.Sprintf("%s %s %s", identifier, cw, strings.Replace(s, "List of", "a list of", 1))
+	}
+	if strings.HasPrefix(s, "Indicates") {
+		return fmt.Sprintf("%s %s", identifier, strings.Replace(s, "Indicates", "indicates", 1))
+	}
+	if strings.HasPrefix(s, "The") {
+		return fmt.Sprintf("%s %s %s", identifier, cw, strings.Replace(s, "The", "the", 1))
+	}
+	if strings.HasPrefix(s, "A") {
+		return fmt.Sprintf("%s %s %s", identifier, cw, strings.Replace(s, "A", "a", 1))
+	}
+
+	// Just return something that is, hopefully, *technically* correct.
+	var b strings.Builder
+
+	b.WriteString(strings.ToLower(string(s[0])))
+	b.WriteString(s[1:])
+
+	return fmt.Sprintf("%s %s the %s", identifier, cw, b.String())
 }
 
 func replaceAcronyms(s string) string {
