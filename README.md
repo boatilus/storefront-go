@@ -10,7 +10,7 @@ Documentation is "best effort" given the existing documentation within the schem
 
 ## Requirements
 
-`storefront-go` uses generics to streamline some aspects of working with the API, and therefore requires Go 1.18 (the current beta version [beta 2] works). There is no plan to support Go < 1.18.
+`storefront-go` uses generics to streamline some aspects of working with the API, and therefore requires Go 1.18 (the current release candidate version [RC1] works, as well as beta 2). There is no plan to support Go < 1.18.
 
 ## Introspecting the Schema
 
@@ -41,7 +41,7 @@ rover graph introspect https://<DOMAIN>/api/<API_VERSION>/graphql.json \
 Types from introspecting the current stable `2022-01` schema are already implemented in [`types.go`](types.go). If, as above, you need to target a different API version, manually run `scripts/parse.go`, pointing to the schema file you'd like to use (using `go generate` directly won't be a good option until 1.18 final). So, presently:
 
 ```bash
-go1.18beta2 run scripts/parse.go <PATH_TO_SCHEMA>
+go1.18rc1 run scripts/parse.go <PATH_TO_SCHEMA>
 ```
 
 This will overwrite the existing `types.go`.
@@ -49,7 +49,7 @@ This will overwrite the existing `types.go`.
 ## Installing
 
 ```bash
-go1.18beta2 get github.com/boatilus/storefront-go
+go1.18rc1 get github.com/boatilus/storefront-go
 ```
 
 ## Basic Usage
@@ -57,7 +57,7 @@ go1.18beta2 get github.com/boatilus/storefront-go
 ```go
 import (
     "log"
-    
+
     "github.com/boatilus/storefront-go"
 )
 
@@ -138,5 +138,5 @@ You can then run `go test` using something like [godotenv](https://github.com/jo
 ```bash
 godotenv go test
 # or, currently:
-# godotenv go1.18beta2 test
+# godotenv go1.18rc1 test
 ```
